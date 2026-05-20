@@ -1,0 +1,716 @@
+{
+  "name": "Real Estate Mega Infrastructure",
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        -576,
+        -240
+      ],
+      "id": "0eeefa46-0983-40f2-be0c-f54d6baef847",
+      "name": "When chat message received",
+      "webhookId": "a0bb53fc-b323-4514-8676-8b0da72d3fd3"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "=AI AGENT: SAFE HOUSING COMMAND CENTER (MASTER VERSION)\nRole: Expert Sales Intelligence for 'Safe Housing'.\nToday's Date: {{ $now.setZone('Asia/Dhaka').toFormat('cccc, MMMM dd, yyyy') }}\nCurrent Time: {{ $now.setZone('Asia/Dhaka').toFormat('hh:mm a') }} (Dhaka Time)\n\nREMEMEBER: AS AN AI AGENT, YOUT JOB IS TO UNDERSTAND THE CHAT OF USER AND PASS THE INFO TO THE APRRORPIATE PORT. Later, they will handle the rest\n\nSTRICTLY follow this command:\nSTEP 1: If user talks anything about plot like location, availability,price, etc those are inserted into the Supabase(Plots_Information) node, then use port 0 of switch node to fetch precise info. \n\nSTEP2: If user wants to visit the site, ASK HIM FIRST the day he wants to visit. ONCE he provides the day, then use port 2 of switch (Calendar) to check the available time slots of that day within 8 am to 6 pm. \n\nSTEP 3: Provides all the free slots to the user and him to pick one. \n\nSTEP 4: When he picks one, then you MUST ask his name,phone and email for further lead capturing processes. DO NOT go further without these three.\n\nSTEP 5: When he provides these info, fetct the google map of the selected plot's location from SUpabase(Plots_Information) and also selected Day and Time from chat and INSERT all these data to port 1 of switch. Insert the data to their determined columns.\n\nSTEP 6: Then the http req is executed and 2nd workflow starts. Then the Calendar (create even) should automaticcaly create an event to the exact slot with google map link that it will receive from port 1 of workflow 1 (Supabase(Lead_capture)). AND right after that, the telegram node should eb executed with the values passed from Supabase(Lead_Capture).\n\nSTEP 7: For any irrelevant chats that are not related to 'Safe Housing', USE port 3 (General) port. \n\nFor replying, USE set node for precise format.\n\nAIMPORTANT: RESPONSE FORMAT (STRICT JSON ONLY)\nBased on the steps above, you MUST only output a JSON object. No conversational text outside the JSON.\n\nJSON Schema:\n{\n\"intent\": \"SEARCHING\" | \"BOOKING\" | \"FREE_SLOT\" | \"GENERAL\",\n\"location\": \"Extract location if mentioned, else null\",\n\"day\": \"Extract day if mentioned, else null\",\n\"time\": \"Extract time if mentioned, else null\",\n\"lead_info\": { \"name\": \"null\", \"phone\": \"null\", \"email\": \"null\" },\n\"reply\": \"Your message to the user here\"\n}\n\nMapping Rules for Switch Node:\n\nIf Step 1 matches -> intent: \"SEARCHING\" (Port 0)\n\nIf Step 2/3 matches -> intent: \"FREE_SLOT\" (Port 2)\n\nIf Step 4/5 matches -> intent: \"BOOKING\" (Port 1)\n\nIf Step 7 matches -> intent: \"GENERAL\" (Port 3)\n\"STRICT RULE: Your 'reply' field must only contain the conversation for the user. Do NOT write internal thoughts, step numbers, or bracketed info in the reply field. Just the human-like response precisely. DO NOT REPLY IN JSON FORMAT"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -384,
+        -336
+      ],
+      "id": "a866187b-171c-48ec-ae4b-16d9e7183fbd",
+      "name": "AI Agent",
+      "alwaysOutputData": true,
+      "executeOnce": false,
+      "retryOnFail": true,
+      "maxTries": 5,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "calendar": {
+          "__rl": true,
+          "value": "azmainesadik@gmail.com",
+          "mode": "id"
+        },
+        "start": "={{ $now.setZone('Asia/Dhaka').fromFormat($json.booked_location_and_time.split('|')[1].replace('Slot:', '').trim(), 'cccc, MMMM dd, h a').toISO() }}",
+        "end": "={{ $now.setZone('Asia/Dhaka').fromFormat($json.booked_location_and_time.split('|')[1].replace('Slot:', '').trim(), 'cccc, MMMM dd, h a').plus({hours: 1}).toISO() }}",
+        "additionalFields": {
+          "description": "={{ $json.contact_number }} | Location: {{ $json.booked_location_and_time.split('|')[0].replace('Map:', '').trim() }}",
+          "location": "={{ $json.booked_location_and_time.split('|')[0].replace('Map:', '').trim() }}",
+          "summary": "=Site Visit: {{ $json.name }}"
+        }
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        1648,
+        16
+      ],
+      "id": "5a8e3d2f-c2fe-4a71-8af5-26e77f5c9eac",
+      "name": "Create an event",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "tuZmqpOUDIsNoC01",
+          "name": "Google Calendar account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/a199e706-afc6-4c81-a4a7-da0c5a8b8c3b",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "name",
+              "value": "={{ JSON.parse($node[\"AI Agent\"].json[\"output\"].split('\\n\\n')[0])[\"arguments\"][\"name\"] }}"
+            },
+            {
+              "name": "contact_number",
+              "value": "={{ JSON.parse($node[\"AI Agent\"].json[\"output\"].split('\\n\\n')[0])[\"arguments\"][\"contact_number\"] }}"
+            },
+            {
+              "name": "email",
+              "value": "={{ JSON.parse($node[\"AI Agent\"].json[\"output\"].split('\\n\\n')[0])[\"arguments\"][\"email\"] }}"
+            },
+            {
+              "name": "booked_location_and_time",
+              "value": "={{ JSON.parse($node[\"AI Agent\"].json[\"output\"].split('\\n\\n')[0])[\"arguments\"][\"booked_location_and_time\"] }}"
+            },
+            {
+              "name": "summary",
+              "value": "={{ JSON.parse($node[\"AI Agent\"].json[\"output\"].split('\\n\\n')[0])[\"arguments\"][\"summary\"] }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        -432
+      ],
+      "id": "803d285e-da57-4d5b-907e-d254c74b69a1",
+      "name": "HTTP Request1"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "a199e706-afc6-4c81-a4a7-da0c5a8b8c3b",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        1648,
+        -208
+      ],
+      "id": "c2284aa7-81ad-41db-ab2a-a48eb18af433",
+      "name": "Lead_Action_Cell",
+      "webhookId": "a199e706-afc6-4c81-a4a7-da0c5a8b8c3b"
+    },
+    {
+      "parameters": {
+        "chatId": "-1003748756971",
+        "text": "=🚨 New Lead Alert!\nName: {{ $json.body.name }}\nPhone: {{ $json.body.contact_number }} \nVisit Details: {{ $json.body.booked_location_and_time }} \n\nHey Moderator, please follow up ASAP! 🦾",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1680,
+        272
+      ],
+      "id": "1f2f6429-1580-49d6-bad7-1fdb62c367bd",
+      "name": "Send a text message",
+      "webhookId": "b23dba02-eb60-400e-b5ae-58bd95a26566",
+      "credentials": {
+        "telegramApi": {
+          "id": "bJfO0JXiourWzeRV",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "meta-llama/llama-3.1-8b-instruct",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenRouter",
+      "typeVersion": 1,
+      "position": [
+        -464,
+        -96
+      ],
+      "id": "2059e0e5-f2c7-447e-b5de-04588f4b9345",
+      "name": "OpenRouter Chat Model",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "openRouterApi": {
+          "id": "PNug419Gzp56gv7T",
+          "name": "OpenRouter account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [
+        -320,
+        -80
+      ],
+      "id": "7fb71223-0dc0-4606-ade0-7812c2d52f84",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "SEARCHING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f84314e7-a9de-4d78-9c0d-fc7cd0c43067"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "891e6dae-5d70-40a2-9900-ff5ba02b3109",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "BOOKING",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "f6e00994-19eb-4654-96df-8c3fb25d7ddf",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "FREE_SLOT",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7b956920-b660-4bb7-bd65-0d83612b9c0e",
+                    "leftValue": "={{ $json.intent }}",
+                    "rightValue": "GENERAL",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        96,
+        -336
+      ],
+      "id": "38d4b11b-e099-43c2-85c3-3d7ffa521b4a",
+      "name": "Switch",
+      "executeOnce": false,
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "tableId": "Plots_Information",
+        "limit": 16,
+        "matchType": "={{ $node[\"Code in JavaScript\"].json.Location }}"
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        336,
+        -592
+      ],
+      "id": "5153843c-c397-4749-8dfe-33536ba6a90c",
+      "name": "Get many rows",
+      "credentials": {
+        "supabaseApi": {
+          "id": "0vFBxCcM1pfU8nud",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "calendar": {
+          "__rl": true,
+          "value": "azmainesadik@gmail.com",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleCalendar",
+      "typeVersion": 1.3,
+      "position": [
+        384,
+        -240
+      ],
+      "id": "66fd8285-6fe1-4e18-8a2c-e43290716477",
+      "name": "Get many events",
+      "credentials": {
+        "googleCalendarOAuth2Api": {
+          "id": "HBkUhUgxkHXdhk1F",
+          "name": "Google Calendar account 3"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4456b8a0-cda4-4360-90d2-0da06b8ce717",
+              "name": "final_answer",
+              "value": "Sorry Sir/Mam! I am only here to assis you regarding 'Safe Housing' real estate company. ",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        592,
+        32
+      ],
+      "id": "22a3686c-2082-4d47-b8ee-0e9984c2f5fc",
+      "name": "Edit Fields",
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "=TEST MESSAGE",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        1440,
+        -384
+      ],
+      "id": "82c2951b-5484-4ac7-96bc-3641e433e097",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "14cad466-ff32-4ccc-bf93-44da8d41ca2d",
+              "name": "final_answer",
+              "value": "Excellent choice, Sir/Mam! \nI've successfully recorded your request for {{ $node[\"AI Agent\"].json.Location }}.\n Our team will contact you soon at {{ $node[\"AI Agent\"].json.contact_number}}.",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        832,
+        -432
+      ],
+      "id": "0e3f5c5a-a710-498f-9f6f-5e3b61eed990",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "14221f51-f758-4dfc-a787-0a920df4996b",
+              "name": "final_answer",
+              "value": "=Here is the plot info for you, Sir/Mam! \n📍 Location: {{ $json.Location }} \n💰 Price: {{ $json.Budget }} BDT.\nWould you like to book a visit?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        848,
+        -592
+      ],
+      "id": "99de1d5a-ecee-426d-9343-8ee6d4eab640",
+      "name": "Edit Fields2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b5724612-e085-41d4-ac95-76205b73f0bf",
+              "name": "final_answer",
+              "value": "=Sir/Mam, I found these available slots for you: {{ $json.start }} to {{ $json.end }}.\nWhich one suits you best?",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        816,
+        -240
+      ],
+      "id": "1b4d645c-53f2-404d-a40e-1d2444fb40ae",
+      "name": "Edit Fields3"
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "tableId": "Lead_Capture",
+        "fieldsUi": {
+          "fieldValues": [
+            {
+              "fieldId": "name",
+              "fieldValue": "={{ $json.name }}"
+            },
+            {
+              "fieldId": "contact_number",
+              "fieldValue": "={{ $json.contact_number }}"
+            },
+            {
+              "fieldId": "email",
+              "fieldValue": "={{ $json.email }}"
+            },
+            {
+              "fieldId": "booked_location_and_date",
+              "fieldValue": "={{ $json.booked_location_and_date }}"
+            },
+            {
+              "fieldId": "summery",
+              "fieldValue": "={{ $json.summery }}"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        320,
+        -432
+      ],
+      "id": "5e932f32-6a7e-4c9c-a3a9-2b7533dcfecf",
+      "name": "Update a row",
+      "credentials": {
+        "supabaseApi": {
+          "id": "0vFBxCcM1pfU8nud",
+          "name": "Supabase account 4"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "\nlet finalData = { intent: \"GENERAL\", Location: null, Budget: null, reply: \"Processing...\" };\n\nfor (const item of items) {\n \n  if (item.json && item.json.intent) {\n    finalData.intent = item.json.intent;\n    finalData.Location = item.json.Location || item.json.location || null;\n    finalData.Budget = item.json.Budget || item.json.budget || null;\n    finalData.reply = item.json.reply;\n  }\n}\n\nreturn [{\n  json: {\n    intent: finalData.intent,\n    Location: finalData.Location,\n    Budget: finalData.Budget,\n    reply: finalData.reply,\n    final_stroke: \"Active\" \n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -80,
+        -416
+      ],
+      "id": "d311a914-82fd-4f95-90b3-e540690af3d4",
+      "name": "Code in JavaScript",
+      "alwaysOutputData": true
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an event": {
+      "main": [
+        [
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Lead_Action_Cell": {
+      "main": [
+        [
+          {
+            "node": "Create an event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenRouter Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Get many rows",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Update a row",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Get many events",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many rows": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get many events": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields3",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields3": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields2": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update a row": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1e55a613-7b4b-4636-a0a5-24edb4efb94a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2568734beca58ca5ce7b25fcc65d6edddeeb76e1ec80d4977434b17e361e5e75"
+  },
+  "id": "ZuFZA3tvOEtb1R59",
+  "tags": []
+}

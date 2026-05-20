@@ -1,0 +1,22 @@
+This is all about my database information (used in Supabase):
+
+Name of Database: Real Estate Demo
+
+Number of Tables: 2
+
+Table 1 name: Plots_Information
+
+Characteristics: Number of column : 11, Number of rows: 15
+
+Description: In this table, I have taken 15 individual plot or apartments information and categorized them into multiple divisions and criteria like (Rooms, Washrooms, Location, Total floor, Apartment at, Square feet, Budget, Down Payment, Installment and Available for) - these are the labeling of column as well. It will help the company to communicate with clients and their queries.
+
+Table 2 name: Lead_Capture
+
+Characteristics: Number of column : 5, Rows will take the confirmed clients information
+
+Description: This table stores all the necessary information after they are marked as the lead client of potential client. They also have to provide some credentials for the authority so that they can communicate with them later on. 
+
+
+
+
+
